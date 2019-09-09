@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## Helpful functions
 INFO(){ echo "INFO:" "$@"; }
@@ -13,7 +13,7 @@ export UUID AL16M AL128K
 
 readonly AL128K="$((128*1024))"
 readonly AL16M="$((16*1024*1024))"
-readonly CONFIG_DIR=@ETC_PREFIX@/bees/
+readonly CONFIG_DIR=@ETC_PREFIX@/bees
 
 readonly bees_bin=$(realpath @LIBEXEC_PREFIX@/bees)
 
@@ -64,18 +64,28 @@ for arg in "${ARGUMENTS[@]}"; do
 done
 
 for arg in "${NOT_SUPPORTED_ARGS[@]}"; do
-    if uuid_valid $arg; then
-        [ ! -z "$UUID" ] && help
-        UUID=$arg
-    fi
+    [ ! -z "$ARGUMENT" ] && help
+    ARGUMENT=$arg
 done
 
-[ -z "$UUID" ] && help
+[ -z "$ARGUMENT" ] && help
 
+if [[ $ARGUMENT == ????????-????-????-????-???????????? ]]; then
+    # Got UUID
+    FILE_CONFIG="$(egrep -l '^[^#]*UUID\s*=\s*"?'"$ARGUMENT" "$CONFIG_DIR"/*.conf | head -1)"
+    UUID="$ARGUMENT"
+else
+    # Got config name
+    FILE_CONFIG="$CONFIG_DIR/$ARGUMENT.conf"
+    UUID="$(egrep '^[^#]*UUID\s*=\s*"?' "$CONFIG_DIR/$ARGUMENT.conf" |sed 's/UUID="\([[:print:]]*\)"/\1/g')"
+fi
 
-FILE_CONFIG="$(egrep -l '^[^#]*UUID\s*=\s*"?'"$UUID" "$CONFIG_DIR"/*.conf | head -1)"
-[ ! -f "$FILE_CONFIG" ] && ERRO "No config for $UUID"
-INFO "Find $UUID in $FILE_CONFIG, use as conf"
+if ! uuid_valid $UUID; then
+    help
+fi
+
+[ ! -f "$FILE_CONFIG" ] && ERRO "No config for $ARGUMENT"
+INFO "Find $ARGUMENT in $FILE_CONFIG, use as conf"
 source "$FILE_CONFIG"
 
 
@@ -85,8 +95,7 @@ source "$FILE_CONFIG"
     [ "$UID" == "0" ] || ERRO "Must be run as root"
 }
 
-
-WORK_DIR="${WORK_DIR:-/run/bees/}"
+WORK_DIR="${WORK_DIR:-/run/bees}"
 MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
 BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
